@@ -1,0 +1,158 @@
+#!/usr/bin/env php
+<?php
+
+declare(strict_types=1);
+
+// Locate autoloader (Composer or pure PHP fallback)
+if (file_exists(__DIR__ . '/../vendor/autoload.php')) {
+    require_once __DIR__ . '/../vendor/autoload.php';
+} else {
+    require_once __DIR__ . '/../src/autoload.php';
+}
+
+use EidCloud\SecurityScanner\Model\Severity;
+use EidCloud\SecurityScanner\Reporter\ConsoleReporter;
+use EidCloud\SecurityScanner\Reporter\JsonReporter;
+use EidCloud\SecurityScanner\Scanner;
+
+const VERSION = '1.0.0';
+
+function printHelp(): void
+{
+    $help = <<<HELP
+\033[1;36mEidCloud Static Security Scanner\033[0m - High-Precision PHP SAST (v%s)
+Author: Eng. MHD. Shadi AL-Hasan <eng.shadi.alhasan@eidcloud.com>
+
+\033[1;33mUSAGE:\033[0m
+  php bin/eidcloud-sec scan <path> [options]
+  php bin/eidcloud-sec [options]
+
+\033[1;33mCOMMANDS:\033[0m
+  scan <path>              Scan target file or directory for security vulnerabilities.
+
+\033[1;33mOPTIONS:\033[0m
+  --fail-on=<level>        CI failure threshold: critical, high, medium, low (exits with code 1).
+  --json                   Output scan results in structured JSON format.
+  --output=<file>          Save scan report to a specified file path.
+  --no-ansi                Disable ANSI color escape sequences in terminal output.
+  --verbose                Display verbose analysis and taint traces.
+  -h, --help               Display this help guide and command list.
+  -v, --version            Display version information.
+
+\033[1;33mEXAMPLES:\033[0m
+  php bin/eidcloud-sec scan ./src
+  php bin/eidcloud-sec scan ./project --fail-on=high
+  php bin/eidcloud-sec scan ./project --json > report.json
+  php bin/eidcloud-sec scan ./project --output=security-report.json --json
+  php bin/eidcloud-sec scan ./vulnerable-script.php
+
+HELP;
+    echo sprintf($help, VERSION);
+}
+
+function printVersion(): void
+{
+    echo sprintf("eidcloud-security-scanner version %s (PHP %s)\n", VERSION, PHP_VERSION);
+}
+
+$argvCopy = $argv;
+array_shift($argvCopy); // remove script name
+
+if (empty($argvCopy) || in_array('-h', $argvCopy, true) || in_array('--help', $argvCopy, true)) {
+    printHelp();
+    exit(0);
+}
+
+if (in_array('-v', $argvCopy, true) || in_array('--version', $argvCopy, true)) {
+    printVersion();
+    exit(0);
+}
+
+$command = array_shift($argvCopy);
+if ($command !== 'scan') {
+    // If user provided a path directly without 'scan' keyword, treat as scan
+    if ($command !== null && !str_starts_with($command, '-')) {
+        $targetPath = $command;
+    } else {
+        echo "\033[1;31mError: Unknown command '{$command}'. Run with --help for usage.\033[0m\n";
+        exit(1);
+    }
+} else {
+    $targetPath = array_shift($argvCopy);
+}
+
+if ($targetPath === null || str_starts_with($targetPath, '-')) {
+    echo "\033[1;31mError: Missing target file or directory path.\033[0m\n";
+    echo "Usage: php bin/eidcloud-sec scan <path> [options]\n";
+    exit(1);
+}
+
+// Parse flags
+$isJson = false;
+$noAnsi = false;
+$verbose = false;
+$failOnStr = null;
+$outputFile = null;
+
+foreach ($argvCopy as $arg) {
+    if ($arg === '--json') {
+        $isJson = true;
+    } elseif ($arg === '--no-ansi') {
+        $noAnsi = true;
+    } elseif ($arg === '--verbose') {
+        $verbose = true;
+    } elseif (str_starts_with($arg, '--fail-on=')) {
+        $failOnStr = substr($arg, strlen('--fail-on='));
+    } elseif (str_starts_with($arg, '--output=')) {
+        $outputFile = substr($arg, strlen('--output='));
+    }
+}
+
+// Validate fail-on threshold if provided
+$failOnSeverity = null;
+if ($failOnStr !== null) {
+    try {
+        $failOnSeverity = Severity::fromString($failOnStr);
+    } catch (\InvalidArgumentException $e) {
+        echo "\033[1;31mError: Invalid --fail-on level '{$failOnStr}'. Choose from: critical, high, medium, low.\033[0m\n";
+        exit(1);
+    }
+}
+
+$scanner = new Scanner();
+
+try {
+    $scanResult = $scanner->scanPath($targetPath);
+} catch (\Throwable $e) {
+    echo "\033[1;31mScan error: " . $e->getMessage() . "\033[0m\n";
+    exit(1);
+}
+
+if ($isJson) {
+    $jsonReporter = new JsonReporter();
+    $reportOutput = $jsonReporter->render($scanResult, true);
+    if ($outputFile !== null) {
+        file_put_contents($outputFile, $reportOutput);
+        echo "JSON report written to: {$outputFile}\n";
+    } else {
+        echo $reportOutput . "\n";
+    }
+} else {
+    $consoleReporter = new ConsoleReporter(!$noAnsi, $verbose);
+    $reportOutput = $consoleReporter->render($scanResult, $failOnSeverity);
+    echo $reportOutput;
+
+    if ($outputFile !== null) {
+        // Strip ANSI codes if writing text to output file
+        $plainText = preg_replace('/\033\[[0-9;]*m/', '', $reportOutput);
+        file_put_contents($outputFile, $plainText);
+        echo "Report written to: {$outputFile}\n";
+    }
+}
+
+// Exit code evaluation for CI / pipelines
+if ($failOnSeverity !== null && $scanResult->hasSeverityOrAbove($failOnSeverity)) {
+    exit(1);
+}
+
+exit(0);

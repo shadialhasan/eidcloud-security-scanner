@@ -1,0 +1,12 @@
+{
+  "description": "High-precision static application security testing (SAST) scanner detecting SQLi, XSS, RCE, and SSRF in pure PHP",
+  "topics": [
+    "eidcloud",
+    "sast-scanner",
+    "security-scanner",
+    "owasp-top-10",
+    "vulnerability-detection",
+    "code-security",
+    "php8"
+  ]
+}

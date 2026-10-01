@@ -1,0 +1,23 @@
+# Composer
+vendor/
+composer.lock
+
+# IDE & OS
+.idea/
+.vscode/
+*.sublime-project
+*.sublime-workspace
+.DS_Store
+Thumbs.db
+
+# Test reports & caches
+.phpunit.cache/
+.phpunit.result.cache
+coverage/
+*.log
+report.json
+
+# Scratch & temporary
+scratch/
+tmp/
+*.tmp

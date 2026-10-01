@@ -1,0 +1,34 @@
+{
+  "name": "eidcloud/security-scanner",
+  "description": "High-precision static application security testing (SAST) scanner detecting SQLi, XSS, RCE, and SSRF in pure PHP",
+  "type": "library",
+  "license": "MIT",
+  "authors": [
+    {
+      "name": "MHD. Shadi AL-Hasan",
+      "email": "eng.shadi.alhasan@eidcloud.com",
+      "role": "Lead Architect & Security Engineer"
+    }
+  ],
+  "require": {
+    "php": ">=8.2"
+  },
+  "autoload": {
+    "psr-4": {
+      "EidCloud\\SecurityScanner\\": "src/"
+    }
+  },
+  "autoload-dev": {
+    "psr-4": {
+      "EidCloud\\SecurityScanner\\Tests\\": "tests/"
+    }
+  },
+  "bin": [
+    "bin/eidcloud-sec"
+  ],
+  "scripts": {
+    "test": "php tests/run_tests.php"
+  },
+  "minimum-stability": "stable",
+  "prefer-stable": true
+}
